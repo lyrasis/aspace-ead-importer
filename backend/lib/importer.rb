@@ -85,9 +85,9 @@ module ArchivesSpace
     end
 
     def has_valid_repository?
-      # TODO
-      # fail if cannot find repository
-      true
+      repository = Repository.where(@repository_property => @repository_value)
+      @repository_id = (repository and repository.count == 1) ? repository.first.id : nil
+      @repository_id
     end
 
     def setup
@@ -106,11 +106,10 @@ module ArchivesSpace
       success = false
       ticker  = ArchivesSpace::Importer::Ticker.new
       DB.open(DB.supports_mvcc?, :retry_on_optimistic_locking_fail => true) do
-        # RequestContext.open(:create_enums => @create_enums, :current_username => @batch_username, :repo_id => @repository_id) do
         RequestContext.open(
           :create_enums => @create_enums,
           :current_username => @batch_username,
-          :repo_id => 2
+          :repo_id => @repository_id
         ) do
           File.open(batch_file, "r") do |fh|
             batch = StreamingImport.new(fh, ticker, false)
