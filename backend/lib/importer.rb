@@ -45,6 +45,7 @@ module ArchivesSpace
 
               c.remove_files
               FileUtils.remove_file ead_file
+              $stdout.puts "Converted #{fn}" if @verbose
             rescue Exception => ex
               File.open(@ead_error_file, 'a') { |f| f.puts "#{fn}: #{ex.message}" }
             end
@@ -66,6 +67,7 @@ module ArchivesSpace
         begin
           stream batch_file
           FileUtils.remove_file batch_file
+          $stdout.puts "Imported #{fn}" if @verbose
         rescue Exception => ex
           File.open(@json_error_file, 'a') { |f| f.puts "#{fn}: #{ex.message}" }
         end
