@@ -10,6 +10,9 @@ module ArchivesSpace
       @config = config
 
       @batch_enabled       = @config[:batch][:enabled]
+      @batch_username      = @config[:batch][:username]
+      @create_enums        = @config[:batch][:create_enums]
+      @repository_id       = nil # retrieve this via repo prop -> value lookup
       @repository_property = @config[:batch][:repository].keys.first
       @repository_value    = @config[:batch][:repository].values.first
       @ead_directory       = @config[:ead][:directory]
@@ -61,7 +64,7 @@ module ArchivesSpace
       Dir.glob("#{@json_directory}/*.json").each do |batch_file|
         fn = File.basename(batch_file, ".*")
         begin
-          # TODO
+          stream batch_file
           FileUtils.remove_file batch_file
         rescue Exception => ex
           File.open(@json_error_file, 'a') { |f| f.puts "#{fn}: #{ex.message}" }
@@ -82,7 +85,7 @@ module ArchivesSpace
     def has_valid_repository?
       # TODO
       # fail if cannot find repository
-      false
+      true
     end
 
     def setup
@@ -95,6 +98,52 @@ module ArchivesSpace
         @ead_error_file,
         @json_error_file,
       ].each { |f| File.new(f, "w") }
+    end
+
+    def stream(batch_file)
+      success = false
+      ticker  = ArchivesSpace::Importer::Ticker.new
+      DB.open(DB.supports_mvcc?, :retry_on_optimistic_locking_fail => true) do
+        # RequestContext.open(:create_enums => @create_enums, :current_username => @batch_username, :repo_id => @repository_id) do
+        RequestContext.open(
+          :create_enums => @create_enums,
+          :current_username => @batch_username,
+          :repo_id => 2
+        ) do
+          File.open(batch_file, "r") do |fh|
+            batch = StreamingImport.new(fh, ticker, false)
+            batch.process
+            success = true
+          end
+        end
+      end
+      raise "Batch import failed for #{batch_file}" unless success
+      success
+    end
+
+    class Ticker
+
+      def initialize(out = $stdout)
+        @out = out
+      end
+
+
+      def tick
+      end
+
+
+      def status_update(status_code, status)
+        @out.puts("#{status[:id]}. #{status_code.upcase}: #{status[:label]}")
+      end
+
+
+      def log(s)
+        @out.puts(s)
+      end
+
+
+      def tick_estimate=(n)
+      end
     end
 
   end

@@ -3,11 +3,13 @@ require_relative 'lib/importer'
 unless AppConfig.has_key? :ead_importer
   AppConfig[:ead_importer] = {
     batch: {
-      enabled: false,
+      create_enums: true,
+      enabled: true,
       repository: {
         id: 2,
         # repo_code: 'TEST',
-      }
+      },
+      username: 'admin',
     },
     ead: {
       directory: "/tmp/aspace/ead",
