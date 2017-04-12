@@ -4,7 +4,7 @@ unless AppConfig.has_key? :ead_importer
   AppConfig[:ead_importer] = {
     batch: {
       create_enums: true,
-      enabled: true,
+      enabled: false,
       repository: {
         id: 2,
         # repo_code: 'TEST',
