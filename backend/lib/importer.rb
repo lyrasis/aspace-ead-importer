@@ -32,28 +32,22 @@ module ArchivesSpace
       raise "NO EAD FILES TO CONVERT =(" unless has_ead_files?
       $stdout.puts "Converting EAD (#{@ead_directory}) to JSON (#{@json_directory}) at #{Time.now.to_s}" if @verbose
       
-      threads = []
-      @input.each_slice((@length / @threads.to_f).ceil) do |files|
-        threads << Thread.new do
-          files.each do |ead_file|
-            fn = File.basename(ead_file, ".*")
-            begin
-              c = Converter.for('ead_xml', ead_file)
-              c.run
+      with_files(@input, @length, @threads) do |ead_file|
+        fn = File.basename(ead_file, ".*")
+        begin
+          c = Converter.for('ead_xml', ead_file)
+          c.run
 
-              FileUtils.cp(c.get_output_path, File.join(@json_directory, "#{fn}.json"))
+          FileUtils.cp(c.get_output_path, File.join(@json_directory, "#{fn}.json"))
 
-              c.remove_files
-              FileUtils.remove_file ead_file
-              $stdout.puts "Converted #{fn}" if @verbose
-            rescue Exception => ex
-              File.open(@ead_error_file, 'a') { |f| f.puts "#{fn}: #{ex.message}" }
-            end
-          end
+          c.remove_files
+          FileUtils.remove_file ead_file
+          $stdout.puts "Converted #{fn}" if @verbose
+        rescue Exception => ex
+          File.open(@ead_error_file, 'a') { |f| f.puts "#{fn}: #{ex.message}" }
         end
       end
 
-      threads.map(&:join)
       $stdout.puts "Finished EAD conversion to #{@json_directory} at #{Time.now.to_s}" if @verbose
     end
 
@@ -62,7 +56,11 @@ module ArchivesSpace
       raise "INVALID REPOSITORY =(" unless has_valid_repository?
       $stdout.puts "Importing JSON (#{@json_directory}) at #{Time.now.to_s}" if @verbose
 
-      Dir.glob("#{@json_directory}/*.json").each do |batch_file|
+      input  = Dir.glob("#{@json_directory}/*.json")
+      length = input.length
+
+      # one-by-one only or else ...
+      with_files(input, length, 1) do |batch_file|
         fn = File.basename(batch_file, ".*")
         begin
           stream batch_file
@@ -122,26 +120,34 @@ module ArchivesSpace
       success
     end
 
+    def with_files(files_glob, length, num_threads = 1)
+      threads = []
+      files_glob.each_slice((length / num_threads.to_f).ceil) do |files|
+        threads << Thread.new do
+          files.each do |file|
+            yield file
+          end
+        end
+      end
+      threads.map(&:join)
+    end
+
     class Ticker
 
       def initialize(out = $stdout)
         @out = out
       end
 
-
       def tick
       end
-
 
       def status_update(status_code, status)
         @out.puts("#{status[:id]}. #{status_code.upcase}: #{status[:label]}")
       end
 
-
       def log(s)
         @out.puts(s)
       end
-
 
       def tick_estimate=(n)
       end
