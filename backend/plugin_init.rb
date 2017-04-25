@@ -11,6 +11,14 @@ unless AppConfig.has_key? :ead_importer
       },
       username: 'admin',
     },
+    # EXAMPLE unitid converter
+    # converter: {
+    #   unitid: {
+    #     split_pattern: "-",
+    #     id_0: ->(value) { value },
+    #     id_1: ->(value) { value.rjust(4, '0') },
+    #   }
+    # },
     ead: {
       directory: "/tmp/aspace/ead",
       error_file: "/tmp/aspace/ead/ead-importer.err",

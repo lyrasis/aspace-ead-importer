@@ -2,6 +2,26 @@ class ImporterEADConverter < EADConverter
 
   def self.configure
     super
+
+    eic = AppConfig[:ead_importer][:converter] || {}
+
+    with 'unitid' do |node|
+      ancestor(:note_multipart, :resource, :archival_object) do |obj|
+        case obj.class.record_type
+        when 'resource'
+          if eic.has_key? :unitid
+            inner_xml.split(/#{eic[:unitid][:split_pattern]}/).each_with_index do |id, i|
+              id_x = "id_#{i}".to_sym
+              set obj, id_x, eic[:unitid][id_x].call(id)
+            end
+          else
+            set obj, :id_0, inner_xml
+          end
+        when 'archival_object'
+          set obj, :component_id, inner_xml
+        end
+      end
+    end
   end # END configure
 
   # Templates Section
