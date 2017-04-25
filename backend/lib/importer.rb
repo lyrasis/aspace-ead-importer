@@ -69,7 +69,7 @@ module ArchivesSpace
         rescue Exception => ex
           File.open(@json_error_file, 'a') { |f| f.puts "#{fn}: #{ex.message}" }
         end
-      end
+      end if length > 0
 
       $stdout.puts "Finished JSON import at #{Time.now.to_s}" if @verbose
     end
