@@ -20,6 +20,7 @@ unless AppConfig.has_key? :ead_importer
     #   }
     # },
     ead: {
+      converter: "ImporterEADConverter",
       directory: "/tmp/aspace/ead",
       error_file: "/tmp/aspace/ead/ead-importer.err",
     },

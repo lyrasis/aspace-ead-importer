@@ -90,6 +90,3 @@ class ImporterEADConverter < EADConverter
   end
 
 end # END class
-
-::EADConverter
-::EADConverter = ImporterEADConverter

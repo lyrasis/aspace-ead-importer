@@ -15,6 +15,7 @@ module ArchivesSpace
       @repository_id       = nil # retrieve this via repo prop -> value lookup
       @repository_property = @config[:batch][:repository].keys.first
       @repository_value    = @config[:batch][:repository].values.first
+      @converter           = @config[:ead][:converter]
       @ead_directory       = @config[:ead][:directory]
       @ead_error_file      = @config[:ead][:error_file]
       @json_directory      = @config[:json][:directory]
@@ -35,7 +36,7 @@ module ArchivesSpace
       with_files(@input, @length, @threads) do |ead_file|
         fn = File.basename(ead_file, ".*")
         begin
-          c = Converter.for('ead_xml', ead_file)
+          c = Object.const_get(@converter).new(ead_file)
           c.run
 
           FileUtils.cp(c.get_output_path, File.join(@json_directory, "#{fn}.json"))
