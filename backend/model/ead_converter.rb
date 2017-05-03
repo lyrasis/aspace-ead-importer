@@ -78,14 +78,33 @@ class ImporterEADConverter < EADConverter
       }
     end
 
+    authorized_name = att('normal')
+    display_name_authorized = (authorized_name and authorized_name == inner_xml) ? true : false
+
     make :name_person, {
       :name_order => 'inverted',
       :primary_name => inner_xml,
       :authority_id => att('id'),
       :rules => att('rules'),
-      :source => att('source') || 'ingest'
+      :source => att('source') || 'ingest',
+      :authorized => display_name_authorized,
+      :is_display_name => true,
     } do |name|
       set ancestor(:agent_person), :names, name
+    end
+
+    if authorized_name and not display_name_authorized
+      make :name_person, {
+        :name_order => 'inverted',
+        :primary_name => att('normal'),
+        :authority_id => att('id'),
+        :rules => att('rules'),
+        :source => att('source') || 'ingest',
+        :authorized => true,
+        :is_display_name => false,
+      } do |name|
+        set ancestor(:agent_person), :names, name
+      end
     end
   end
 
