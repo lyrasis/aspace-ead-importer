@@ -1,7 +1,7 @@
 require_relative 'lib/importer'
 
-unless AppConfig.has_key? :ead_importer
-  AppConfig[:ead_importer] = {
+unless AppConfig.has_key? :importer
+  AppConfig[:importer] = {
     batch: {
       create_enums: true,
       enabled: false,
@@ -19,21 +19,37 @@ unless AppConfig.has_key? :ead_importer
     #     id_1: ->(value) { value.rjust(4, '0') },
     #   }
     # },
-    ead: {
-      converter: "ImporterEADConverter",
-      directory: "/tmp/aspace/ead",
-      error_file: "/tmp/aspace/ead/ead-importer.err",
+    import: {
+      # EXAMPLE marcxml agents and subjects
+      # converter: "MarcXMLConverter",
+      # type: "marcxml_subjects_and_agents",
+      converter: "EADConverter",
+      type: "ead_xml",
+      directory: "/tmp/aspace/import",
+      error_file: "/tmp/aspace/import/importer.err",
     },
     json: {
       directory: "/tmp/aspace/json",
-      error_file: "/tmp/aspace/json/ead-importer.err",
+      error_file: "/tmp/aspace/json/importer.err",
     },
-    schedule: nil,
     threads: 2,
     verbose: true,
   }
 end
 
-importer = ArchivesSpace::Importer.new AppConfig[:ead_importer]
-importer.convert if importer.has_ead_files? # convert EAD to JSON batch files
-importer.import  if importer.has_batch_enabled? and importer.has_valid_repository? # import JSON batch files
+ArchivesSpaceService.loaded_hook do
+  importer = ArchivesSpace::Importer.new AppConfig[:importer]
+  puts "IMPORTER - initialized with config: #{importer.inspect}"
+
+  if importer.has_files? # convert EAD to JSON batch files
+    importer.convert
+  else
+    puts "IMPORTER - no files to convert."
+  end
+
+  if importer.has_batch_enabled? and importer.has_valid_repository? # import JSON batch files
+    importer.import
+  else
+    puts "IMPORTER - batch disabled or invalid repository."
+  end
+end

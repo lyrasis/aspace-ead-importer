@@ -12,50 +12,55 @@ module ArchivesSpace
       @batch_enabled       = @config[:batch][:enabled]
       @batch_username      = @config[:batch][:username]
       @create_enums        = @config[:batch][:create_enums]
+
       @repository_id       = nil # retrieve this via repo prop -> value lookup
       @repository_property = @config[:batch][:repository].keys.first
       @repository_value    = @config[:batch][:repository].values.first
-      @converter           = @config[:ead][:converter]
-      @ead_directory       = @config[:ead][:directory]
-      @ead_error_file      = @config[:ead][:error_file]
+
+      @converter           = @config[:import][:converter]
+      @type                = @config[:import][:type]
+      @import_directory    = @config[:import][:directory]
+      @import_error_file   = @config[:import][:error_file]
+
       @json_directory      = @config[:json][:directory]
       @json_error_file     = @config[:json][:error_file]
+
       @threads             = @config[:threads]
       @verbose             = @config[:verbose]
 
-      @input  = Dir.glob("#{@ead_directory}/*.xml")
+      @input  = Dir.glob("#{@import_directory}/*.xml")
       @length = @input.length
 
       setup
     end
 
     def convert
-      raise "NO EAD FILES TO CONVERT =(" unless has_ead_files?
-      $stdout.puts "Converting EAD (#{@ead_directory}) to JSON (#{@json_directory}) at #{Time.now.to_s}" if @verbose
-      
-      with_files(@input, @length, @threads) do |ead_file|
-        fn = File.basename(ead_file, ".*")
+      raise "IMPORTER - NO FILES TO CONVERT =(" unless has_files?
+      $stdout.puts "Converting files in (#{@import_directory}) to JSON (#{@json_directory}) at #{Time.now.to_s}" if @verbose
+
+      with_files(@input, @length, @threads) do |file|
+        fn = File.basename(file, ".*")
         begin
-          c = Object.const_get(@converter).new(ead_file)
+          c = Object.const_get(@converter).instance_for(@type, file)
           c.run
 
           FileUtils.cp(c.get_output_path, File.join(@json_directory, "#{fn}.json"))
 
           c.remove_files
-          FileUtils.remove_file ead_file
-          $stdout.puts "Converted #{fn}" if @verbose
+          FileUtils.remove_file file
+          $stdout.puts "IMPORTER - Converted #{fn}" if @verbose
         rescue Exception => ex
-          File.open(@ead_error_file, 'a') { |f| f.puts "#{fn}: #{ex.message}" }
+          File.open(@import_error_file, 'a') { |f| f.puts "#{fn}: #{ex.message}" }
         end
       end
 
-      $stdout.puts "Finished EAD conversion to #{@json_directory} at #{Time.now.to_s}" if @verbose
+      $stdout.puts "IMPORTER - Finished conversion to #{@json_directory} at #{Time.now.to_s}" if @verbose
     end
 
     def import
-      raise "BATCH DISABLED =(" unless has_batch_enabled?
-      raise "INVALID REPOSITORY =(" unless has_valid_repository?
-      $stdout.puts "Importing JSON (#{@json_directory}) at #{Time.now.to_s}" if @verbose
+      raise "IMPORTER - BATCH DISABLED =(" unless has_batch_enabled?
+      raise "IMPORTER - INVALID REPOSITORY =(" unless has_valid_repository?
+      $stdout.puts "IMPORTER - Importing JSON (#{@json_directory}) at #{Time.now.to_s}" if @verbose
 
       input  = Dir.glob("#{@json_directory}/*.json")
       length = input.length
@@ -66,20 +71,20 @@ module ArchivesSpace
         begin
           stream batch_file
           FileUtils.remove_file batch_file
-          $stdout.puts "Imported #{fn}" if @verbose
+          $stdout.puts "IMPORTER - Imported #{fn}" if @verbose
         rescue Exception => ex
           File.open(@json_error_file, 'a') { |f| f.puts "#{fn}: #{ex.message}" }
         end
       end if length > 0
 
-      $stdout.puts "Finished JSON import at #{Time.now.to_s}" if @verbose
+      $stdout.puts "IMPORTER - Finished JSON import at #{Time.now.to_s}" if @verbose
     end
 
     def has_batch_enabled?
       @batch_enabled
     end
 
-    def has_ead_files?
+    def has_files?
       @length > 0
     end
 
@@ -91,12 +96,12 @@ module ArchivesSpace
 
     def setup
       [
-        @ead_directory,
+        @import_directory,
         @json_directory,
       ].each { |d| FileUtils.mkdir_p(d) }
 
       [
-        @ead_error_file,
+        @import_error_file,
         @json_error_file,
       ].each { |f| File.new(f, "w") }
     end
@@ -117,7 +122,7 @@ module ArchivesSpace
           end
         end
       end
-      raise "Batch import failed for #{batch_file}" unless success
+      raise "IMPORTER - Batch import failed for #{batch_file}" unless success
       success
     end
 
