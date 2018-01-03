@@ -32,7 +32,6 @@ unless AppConfig.has_key? :importer
       directory: "/tmp/aspace/json",
       error_file: "/tmp/aspace/json/importer.err",
     },
-    schedule: nil,
     threads: 2,
     verbose: true,
   }
