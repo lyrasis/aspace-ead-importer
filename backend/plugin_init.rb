@@ -38,6 +38,19 @@ unless AppConfig.has_key? :importer
   }
 end
 
-importer = ArchivesSpace::Importer.new AppConfig[:importer]
-importer.convert if importer.has_files? # convert EAD to JSON batch files
-importer.import  if importer.has_batch_enabled? and importer.has_valid_repository? # import JSON batch files
+ArchivesSpaceService.loaded_hook do
+  importer = ArchivesSpace::Importer.new AppConfig[:importer]
+  puts "IMPORTER - initialized with config: #{importer.inspect}"
+
+  if importer.has_files? # convert EAD to JSON batch files
+    importer.convert
+  else
+    puts "IMPORTER - no files to convert."
+  end
+
+  if importer.has_batch_enabled? and importer.has_valid_repository? # import JSON batch files
+    importer.import
+  else
+    puts "IMPORTER - batch disabled or invalid repository."
+  end
+end

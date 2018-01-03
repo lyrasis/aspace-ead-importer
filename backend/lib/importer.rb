@@ -35,7 +35,7 @@ module ArchivesSpace
     end
 
     def convert
-      raise "NO FILES TO CONVERT =(" unless has_files?
+      raise "IMPORTER - NO FILES TO CONVERT =(" unless has_files?
       $stdout.puts "Converting files in (#{@import_directory}) to JSON (#{@json_directory}) at #{Time.now.to_s}" if @verbose
 
       with_files(@input, @length, @threads) do |file|
@@ -48,19 +48,19 @@ module ArchivesSpace
 
           c.remove_files
           FileUtils.remove_file file
-          $stdout.puts "Converted #{fn}" if @verbose
+          $stdout.puts "IMPORTER - Converted #{fn}" if @verbose
         rescue Exception => ex
           File.open(@import_error_file, 'a') { |f| f.puts "#{fn}: #{ex.message}" }
         end
       end
 
-      $stdout.puts "Finished conversion to #{@json_directory} at #{Time.now.to_s}" if @verbose
+      $stdout.puts "IMPORTER - Finished conversion to #{@json_directory} at #{Time.now.to_s}" if @verbose
     end
 
     def import
-      raise "BATCH DISABLED =(" unless has_batch_enabled?
-      raise "INVALID REPOSITORY =(" unless has_valid_repository?
-      $stdout.puts "Importing JSON (#{@json_directory}) at #{Time.now.to_s}" if @verbose
+      raise "IMPORTER - BATCH DISABLED =(" unless has_batch_enabled?
+      raise "IMPORTER - INVALID REPOSITORY =(" unless has_valid_repository?
+      $stdout.puts "IMPORTER - Importing JSON (#{@json_directory}) at #{Time.now.to_s}" if @verbose
 
       input  = Dir.glob("#{@json_directory}/*.json")
       length = input.length
@@ -71,13 +71,13 @@ module ArchivesSpace
         begin
           stream batch_file
           FileUtils.remove_file batch_file
-          $stdout.puts "Imported #{fn}" if @verbose
+          $stdout.puts "IMPORTER - Imported #{fn}" if @verbose
         rescue Exception => ex
           File.open(@json_error_file, 'a') { |f| f.puts "#{fn}: #{ex.message}" }
         end
       end if length > 0
 
-      $stdout.puts "Finished JSON import at #{Time.now.to_s}" if @verbose
+      $stdout.puts "IMPORTER - Finished JSON import at #{Time.now.to_s}" if @verbose
     end
 
     def has_batch_enabled?
@@ -122,7 +122,7 @@ module ArchivesSpace
           end
         end
       end
-      raise "Batch import failed for #{batch_file}" unless success
+      raise "IMPORTER - Batch import failed for #{batch_file}" unless success
       success
     end
 
