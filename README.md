@@ -1,6 +1,7 @@
-# aspace-ead-importer
+# aspace-importer
 
-Convert EAD to JSON batch files and (optionally) load directly into ArchivesSpace.
+Convert import format files (such as EAD XML or MarcXML) to JSON batch files and
+(optionally) load directly into ArchivesSpace.
 
 ## License
 

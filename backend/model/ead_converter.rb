@@ -3,7 +3,7 @@ class ImporterEADConverter < EADConverter
   def self.configure
     super
 
-    eic = AppConfig[:ead_importer][:converter] || {}
+    eic = AppConfig[:importer][:converter] || {}
 
     with 'unitid' do |node|
       ancestor(:note_multipart, :resource, :archival_object) do |obj|
