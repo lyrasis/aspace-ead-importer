@@ -9,6 +9,7 @@ For EAD XML (convert to json but do not import):
 
 ```ruby
 AppConfig[:importer_profiles] = [{
+  name: 'default',
   batch: {
     create_enums: true,
     enabled: false,
@@ -36,6 +37,7 @@ For MarcXML agents and subjects (convert to json and import):
 
 ```ruby
 AppConfig[:importer_profiles] = [{
+  name: 'default',
   batch: {
     create_enums: true,
     enabled: true,
