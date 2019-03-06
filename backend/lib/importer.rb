@@ -4,10 +4,11 @@ module ArchivesSpace
 
   class Importer
 
-    attr_reader :config
+    attr_reader :config, :name
 
     def initialize(config)
       @config = config
+      @name   = @config[:name]
 
       @batch_enabled       = @config[:batch][:enabled]
       @batch_username      = @config[:batch][:username]
@@ -35,7 +36,7 @@ module ArchivesSpace
     end
 
     def convert
-      raise "IMPORTER - NO FILES TO CONVERT =(" unless has_files?
+      raise "IMPORTER [#{name}]: NO FILES TO CONVERT =(" unless has_files?
       $stdout.puts "Converting files in (#{@import_directory}) to JSON (#{@json_directory}) at #{Time.now.to_s}" if @verbose
 
       with_files(@input, @length, @threads) do |file|
@@ -48,19 +49,19 @@ module ArchivesSpace
 
           c.remove_files
           FileUtils.remove_file file
-          $stdout.puts "IMPORTER - Converted #{fn}" if @verbose
+          $stdout.puts "IMPORTER [#{name}]: Converted #{fn}" if @verbose
         rescue Exception => ex
           File.open(@import_error_file, 'a') { |f| f.puts "#{fn}: #{ex.message}" }
         end
       end
 
-      $stdout.puts "IMPORTER - Finished conversion to #{@json_directory} at #{Time.now.to_s}" if @verbose
+      $stdout.puts "IMPORTER [#{name}]: Finished conversion to #{@json_directory} at #{Time.now.to_s}" if @verbose
     end
 
     def import
-      raise "IMPORTER - BATCH DISABLED =(" unless has_batch_enabled?
-      raise "IMPORTER - INVALID REPOSITORY =(" unless has_valid_repository?
-      $stdout.puts "IMPORTER - Importing JSON (#{@json_directory}) at #{Time.now.to_s}" if @verbose
+      raise "IMPORTER [#{name}]: BATCH DISABLED =(" unless has_batch_enabled?
+      raise "IMPORTER [#{name}]: INVALID REPOSITORY =(" unless has_valid_repository?
+      $stdout.puts "IMPORTER [#{name}]: Importing JSON (#{@json_directory}) at #{Time.now.to_s}" if @verbose
 
       input  = Dir.glob("#{@json_directory}/*.json")
       length = input.length
@@ -77,7 +78,7 @@ module ArchivesSpace
         end
       end if length > 0
 
-      $stdout.puts "IMPORTER - Finished JSON import at #{Time.now.to_s}" if @verbose
+      $stdout.puts "IMPORTER [#{name}]: Finished JSON import at #{Time.now.to_s}" if @verbose
     end
 
     def has_batch_enabled?
@@ -122,7 +123,7 @@ module ArchivesSpace
           end
         end
       end
-      raise "IMPORTER - Batch import failed for #{batch_file}" unless success
+      raise "IMPORTER [#{name}]: Batch import failed for #{batch_file}" unless success
       success
     end
 

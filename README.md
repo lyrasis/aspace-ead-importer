@@ -8,7 +8,7 @@ Convert import format files (such as EAD XML or MarcXML) to JSON batch files and
 For EAD XML (convert to json but do not import):
 
 ```ruby
-AppConfig[:importer] = {
+AppConfig[:importer_profiles] = {[
   batch: {
     create_enums: true,
     enabled: false,
@@ -29,13 +29,13 @@ AppConfig[:importer] = {
   },
   threads: 2,
   verbose: true,
-}
+]}
 ```
 
 For MarcXML agents and subjects (convert to json and import):
 
 ```ruby
-AppConfig[:importer] = {
+AppConfig[:importer_profiles] = [{
   batch: {
     create_enums: true,
     enabled: true,
@@ -56,10 +56,10 @@ AppConfig[:importer] = {
   },
   threads: 2,
   verbose: true,
-}
+}]
 ```
 
-## Customized importers
+## Custom importers
 
 - Add a file to `backend/model/my_converter.rb` (the name is not important).
 - Define the custom converter by subclassing an existing converter
