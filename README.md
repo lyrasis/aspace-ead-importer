@@ -8,7 +8,7 @@ Convert import format files (such as EAD XML or MarcXML) to JSON batch files and
 For EAD XML (convert to json but do not import):
 
 ```ruby
-AppConfig[:importer_profiles] = {[
+AppConfig[:importer_profiles] = [{
   batch: {
     create_enums: true,
     enabled: false,
@@ -29,7 +29,7 @@ AppConfig[:importer_profiles] = {[
   },
   threads: 2,
   verbose: true,
-]}
+}]
 ```
 
 For MarcXML agents and subjects (convert to json and import):
