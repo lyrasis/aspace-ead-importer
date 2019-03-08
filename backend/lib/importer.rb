@@ -53,6 +53,7 @@ module ArchivesSpace
           FileUtils.remove_file file
         rescue Exception => ex
           File.open(@import_error_file, 'a') { |f| f.puts "#{fn}: #{ex.message} #{ex.backtrace}" }
+          FileUtils.mv(file, "#{file}.err")
         end
       end
 
