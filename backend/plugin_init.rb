@@ -42,7 +42,6 @@ ArchivesSpaceService.loaded_hook do
   AppConfig[:importer_profiles].each do |profile|
     importer = ArchivesSpace::Importer.new(profile)
     name = importer.name
-    puts "IMPORTER [#{name}]: #{importer.inspect}"
 
     if importer.has_files? # convert EAD to JSON batch files
       importer.convert

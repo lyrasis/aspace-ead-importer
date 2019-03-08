@@ -39,9 +39,11 @@ module ArchivesSpace
       raise "IMPORTER [#{name}]: NO FILES TO CONVERT =(" unless has_files?
       $stdout.puts "Converting files in (#{@import_directory}) to JSON (#{@json_directory}) at #{Time.now.to_s}" if @verbose
 
-      with_files(@input, @length, @threads) do |file|
+      # with_files(@input, @length, @threads) do |file|
+      @input.each do |file|
         fn = File.basename(file, ".*")
         begin
+          $stdout.puts "IMPORTER [#{name}]: Converting #{fn}" if @verbose
           c = Object.const_get(@converter).instance_for(@type, file)
           c.run
 
@@ -49,9 +51,8 @@ module ArchivesSpace
 
           c.remove_files
           FileUtils.remove_file file
-          $stdout.puts "IMPORTER [#{name}]: Converted #{fn}" if @verbose
         rescue Exception => ex
-          File.open(@import_error_file, 'a') { |f| f.puts "#{fn}: #{ex.message}" }
+          File.open(@import_error_file, 'a') { |f| f.puts "#{fn}: #{ex.message} #{ex.backtrace}" }
         end
       end
 
@@ -67,7 +68,8 @@ module ArchivesSpace
       length = input.length
 
       # one-by-one only or else ...
-      with_files(input, length, 1) do |batch_file|
+      # with_files(input, length, 1) do |batch_file|
+      input.each do |batch_file|
         fn = File.basename(batch_file, ".*")
         begin
           stream batch_file
@@ -127,6 +129,7 @@ module ArchivesSpace
       success
     end
 
+    # TODO: revist threads, single for now (monster files)
     def with_files(files_glob, length, num_threads = 1)
       threads = []
       files_glob.each_slice((length / num_threads.to_f).ceil) do |files|
