@@ -1,9 +1,9 @@
+# frozen_string_literal: true
+
 require 'fileutils'
 
 module ArchivesSpace
-
   class Importer
-
     attr_reader :config, :name
 
     def initialize(config)
@@ -28,129 +28,147 @@ module ArchivesSpace
 
       @threads             = @config[:threads]
       @verbose             = @config[:verbose]
-
-      @input  = Dir.glob("#{@import_directory}/*.xml")
-      @length = @input.length
-
+      @lock_file           = File.join(Dir.tmpdir, "aspace.importer.#{@name}.lock")
       setup
     end
 
     def convert
-      raise "IMPORTER [#{name}]: NO FILES TO CONVERT =(" unless has_files?
-      $stdout.puts "Converting files in (#{@import_directory}) to JSON (#{@json_directory}) at #{Time.now.to_s}" if @verbose
+      unless any_xml? && valid_repository?
+        Log.warn("[#{name}]: skipping file conversion (no files)")
+        return
+      end
 
-      # with_files(@input, @length, @threads) do |file|
-      @input.each do |file|
-        fn = File.basename(file, ".*")
+      total = incoming_xml.count
+      Log.info "[#{name}]: converting #{total} files in (#{@import_directory}) at #{Time.now}" if @verbose
+
+      incoming_xml.each do |file|
+        fn = File.basename(file, '.*')
         begin
-          $stdout.puts "IMPORTER [#{name}]: Converting #{fn}" if @verbose
-          c = Object.const_get(@converter).instance_for(@type, file)
-          c.run
+          Log.info "[#{name}]: Converting #{fn}" if @verbose
+          with_context do
+            c = Object.const_get(@converter).instance_for(@type, file)
+            c.run
+            FileUtils.cp(c.get_output_path, File.join(@json_directory, "#{fn}.json"))
+            c.remove_files
+          end
 
-          FileUtils.cp(c.get_output_path, File.join(@json_directory, "#{fn}.json"))
-
-          c.remove_files
           FileUtils.remove_file file
-        rescue Exception => ex
-          File.open(@import_error_file, 'a') { |f| f.puts "#{fn}: #{ex.message} #{ex.backtrace}" }
-          FileUtils.mv(file, "#{file}.err")
+        rescue StandardError => e
+          handle_error(@import_error_file, e, file)
         end
       end
 
-      $stdout.puts "IMPORTER [#{name}]: Finished conversion to #{@json_directory} at #{Time.now.to_s}" if @verbose
+      Log.info "[#{name}]: finished conversion of #{total} files at #{Time.now}" if @verbose
     end
 
     def import
-      raise "IMPORTER [#{name}]: BATCH DISABLED =(" unless has_batch_enabled?
-      raise "IMPORTER [#{name}]: INVALID REPOSITORY =(" unless has_valid_repository?
-      $stdout.puts "IMPORTER [#{name}]: Importing JSON (#{@json_directory}) at #{Time.now.to_s}" if @verbose
+      unless any_json? && batch_enabled? && valid_repository?
+        Log.warn("[#{name}]: skipping import (no files, batch is disabled or repository is invalid)")
+        return
+      end
 
-      input  = Dir.glob("#{@json_directory}/*.json")
-      length = input.length
+      total = incoming_json.count
+      Log.info "[#{name}]: importing #{total} files in (#{@json_directory}) at #{Time.now}" if @verbose
 
-      # one-by-one only or else ...
-      # with_files(input, length, 1) do |batch_file|
-      input.each do |batch_file|
-        fn = File.basename(batch_file, ".*")
+      incoming_json.each do |file|
+        fn = File.basename(file, '.*')
         begin
-          stream batch_file
-          FileUtils.remove_file batch_file
-          $stdout.puts "IMPORTER - Imported #{fn}" if @verbose
-        rescue Exception => ex
-          File.open(@json_error_file, 'a') { |f| f.puts "#{fn}: #{ex.message}" }
+          stream file
+          FileUtils.remove_file file
+          Log.info "[#{name}]: imported #{fn}" if @verbose
+        rescue StandardError => e
+          handle_error(@json_error_file, e, file)
         end
-      end if length > 0
+      end
 
-      $stdout.puts "IMPORTER [#{name}]: Finished JSON import at #{Time.now.to_s}" if @verbose
+      Log.info "[#{name}]: finished importing #{total} files at #{Time.now}" if @verbose
     end
 
-    def has_batch_enabled?
+    def any_json?
+      incoming_json.count.positive?
+    end
+
+    def any_xml?
+      incoming_xml.count.positive?
+    end
+
+    def batch_enabled?
       @batch_enabled
     end
 
-    def has_files?
-      @length > 0
+    def lock
+      FileUtils.touch @lock_file
     end
 
-    def has_valid_repository?
+    def locked?
+      File.exist? @lock_file
+    end
+
+    def stream(file)
+      with_context do
+        File.open(file, 'r') do |fh|
+          batch = StreamingImport.new(fh, ArchivesSpace::Importer::Ticker.new, false)
+          batch.process
+        end
+      end
+    end
+
+    def valid_repository?
       repository = Repository.where(@repository_property => @repository_value)
-      @repository_id = (repository and repository.count == 1) ? repository.first.id : nil
+      @repository_id = repository && (repository.count == 1) ? repository.first.id : nil
+      Log.info "[#{name}]: using repo_id #{@repository_id}" if @repository_id && @verbose
       @repository_id
+    end
+
+    def unlock
+      FileUtils.remove_file @lock_file
+    end
+
+    def with_context
+      DB.open(DB.supports_mvcc?, retry_on_optimistic_locking_fail: true) do
+        RequestContext.open(
+          create_enums: @create_enums,
+          current_username: @batch_username,
+          repo_id: @repository_id
+        ) do
+          yield
+        end
+      end
+    end
+
+    private
+
+    def handle_error(error_file, error, file)
+      File.open(error_file, 'a') { |f| f.puts "#{File.basename(file)}: #{error.message} #{error.backtrace}" }
+      FileUtils.mv(file, "#{file}.err")
+    end
+
+    def incoming_json
+      Dir.glob("#{@json_directory}/*.json")
+    end
+
+    def incoming_xml
+      Dir.glob("#{@import_directory}/*.xml")
     end
 
     def setup
       [
         @import_directory,
-        @json_directory,
-      ].each { |d| FileUtils.mkdir_p(d) }
+        @json_directory
+      ].each { |d| FileUtils.mkdir_p d }
 
       [
         @import_error_file,
-        @json_error_file,
-      ].each { |f| File.new(f, "w") }
-    end
-
-    def stream(batch_file)
-      success = false
-      ticker  = ArchivesSpace::Importer::Ticker.new
-      DB.open(DB.supports_mvcc?, :retry_on_optimistic_locking_fail => true) do
-        RequestContext.open(
-          :create_enums => @create_enums,
-          :current_username => @batch_username,
-          :repo_id => @repository_id
-        ) do
-          File.open(batch_file, "r") do |fh|
-            batch = StreamingImport.new(fh, ticker, false)
-            batch.process
-            success = true
-          end
-        end
-      end
-      raise "IMPORTER [#{name}]: Batch import failed for #{batch_file}" unless success
-      success
-    end
-
-    # TODO: revist threads, single for now (monster files)
-    def with_files(files_glob, length, num_threads = 1)
-      threads = []
-      files_glob.each_slice((length / num_threads.to_f).ceil) do |files|
-        threads << Thread.new do
-          files.each do |file|
-            yield file
-          end
-        end
-      end
-      threads.map(&:join)
+        @json_error_file
+      ].each { |f| FileUtils.touch f }
     end
 
     class Ticker
-
       def initialize(out = $stdout)
         @out = out
       end
 
-      def tick
-      end
+      def tick; end
 
       def status_update(status_code, status)
         @out.puts("#{status[:id]}. #{status_code.upcase}: #{status[:label]}")
@@ -160,10 +178,7 @@ module ArchivesSpace
         @out.puts(s)
       end
 
-      def tick_estimate=(n)
-      end
+      def tick_estimate=(n); end
     end
-
   end
-
 end

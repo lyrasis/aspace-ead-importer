@@ -1,35 +1,36 @@
 # aspace-importer
 
 Convert import format files (such as EAD XML or MarcXML) to JSON batch files and
-(optionally) load directly into ArchivesSpace.
+(optionally) load directly into ArchivesSpace on a recurring schedule.
 
+This plugin allows you to drop files into a directory and have them automatically
+imported into ArchivesSpace.
 ## Configuration examples
 
-For EAD XML (convert to json but do not import):
+For EAD XML (convert to json and import):
 
 ```ruby
 AppConfig[:importer_profiles] = [{
   name: 'default',
   batch: {
     create_enums: true,
-    enabled: false,
+    enabled: true,
     repository: {
-      repo_code: 'TEST',
+      repo_code: 'TEST'
     },
-    username: 'admin',
+    username: 'admin'
   },
   import: {
-    converter: "EADConverter",
-    type: "ead_xml",
-    directory: "/tmp/aspace/ead",
-    error_file: "/tmp/aspace/ead/importer.err",
+    converter: 'EADConverter',
+    type: 'ead_xml',
+    directory: File.join(Dir.tmpdir, 'aspace', 'test', 'ead_xml'),
+    error_file: File.join(Dir.tmpdir, 'aspace', 'test', 'ead_xml', 'importer.err')
   },
   json: {
-    directory: "/tmp/aspace/json",
-    error_file: "/tmp/aspace/json/importer.err",
+    directory: File.join(Dir.tmpdir, 'aspace', 'test', 'json'),
+    error_file: File.join(Dir.tmpdir, 'aspace', 'test', 'json', 'importer.err')
   },
-  threads: 2,
-  verbose: true,
+  verbose: true
 }]
 ```
 
@@ -42,29 +43,40 @@ AppConfig[:importer_profiles] = [{
     create_enums: true,
     enabled: true,
     repository: {
-      repo_code: 'TEST',
+      repo_code: 'TEST'
     },
-    username: 'admin',
+    username: 'admin'
   },
   import: {
-    converter: "MarcXMLConverter",
-    type: "marcxml_subjects_and_agents",
-    directory: "/tmp/aspace/import",
-    error_file: "/tmp/aspace/import/importer.err",
+    converter: 'MarcXMLConverter',
+    type: 'marcxml_subjects_and_agents',
+    directory: File.join(Dir.tmpdir, 'aspace', 'test', 'marcxml'),
+    error_file: File.join(Dir.tmpdir, 'aspace', 'test', 'marcxml', 'importer.err')
   },
   json: {
-    directory: "/tmp/aspace/json",
-    error_file: "/tmp/aspace/json/importer.err",
+    directory: File.join(Dir.tmpdir, 'aspace', 'test', 'json'),
+    error_file: File.join(Dir.tmpdir, 'aspace', 'test', 'json', 'importer.err')
   },
-  threads: 2,
-  verbose: true,
+  verbose: true
 }]
 ```
+
+## Schedule
+
+Use `AppConfig[:importer_schedule]` to determine how often files are checked for. Examples:
+
+- `AppConfig[:importer_schedule] = '*/5 * * * *'` # every 5 minutes [default]
+- `AppConfig[:importer_schedule] = '0 * * * *'` # every hour
+
+The schedule is a [cron](https://crontab.guru/) formatted string.
+
+Import tasks are allowed to run for 1 hour by default. This can be changed with `AppConfig[:importer_timeout]`.
 
 ## Custom importers
 
 - Add a file to `backend/model/my_converter.rb` (the name is not important).
 - Define the custom converter by subclassing an existing converter
+- Reference it in the config: `converter: "MyAwesomeConverter"`
 
 ## License
 
