@@ -1,58 +1,34 @@
+# frozen_string_literal: true
+
 require_relative 'lib/importer'
 
-unless AppConfig.has_key? :importer_profiles
-  AppConfig[:importer_profiles] = [{
-    name: 'default',
-    batch: {
-      create_enums: true,
-      enabled: false,
-      repository: {
-        id: 2,
-        # repo_code: 'TEST',
-      },
-      username: 'admin',
-    },
-    # EXAMPLE unitid converter
-    # converter: {
-    #   unitid: {
-    #     split_pattern: "-",
-    #     id_0: ->(value) { value },
-    #     id_1: ->(value) { value.rjust(4, '0') },
-    #   }
-    # },
-    import: {
-      # EXAMPLE marcxml agents and subjects
-      # converter: "MarcXMLConverter",
-      # type: "marcxml_subjects_and_agents",
-      converter: "EADConverter",
-      type: "ead_xml",
-      directory: "/tmp/aspace/import",
-      error_file: "/tmp/aspace/import/importer.err",
-    },
-    json: {
-      directory: "/tmp/aspace/json",
-      error_file: "/tmp/aspace/json/importer.err",
-    },
-    threads: 2,
-    verbose: true,
-  }]
-end
+AppConfig[:importer_profiles] = [] unless AppConfig.has_key? :importer_profiles
+AppConfig[:importer_schedule] = '*/5 * * * *' unless AppConfig.has_key? :importer_schedule
+AppConfig[:importer_timeout]  = '1h' unless AppConfig.has_key? :importer_timeout
 
 ArchivesSpaceService.loaded_hook do
-  AppConfig[:importer_profiles].each do |profile|
-    importer = ArchivesSpace::Importer.new(profile)
-    name = importer.name
+  ArchivesSpaceService.settings.scheduler.cron(
+    AppConfig[:importer_schedule],
+    allow_overlapping: false, # TODO: [newer versions] overlap: false
+    mutex: 'aspace.importer.schedule',
+    tags: 'aspace.importer.schedule',
+    timeout: AppConfig[:importer_timeout]
+  ) do
+    Log.info "Processing importer profiles: #{AppConfig[:importer_profiles]}"
+    AppConfig[:importer_profiles].each do |profile|
+      importer = ArchivesSpace::Importer.new(profile)
+      # this is an additional guard to prevent a duplicate importer process from running
+      next if importer.locked?
 
-    if importer.has_files? # convert EAD to JSON batch files
-      importer.convert
-    else
-      puts "IMPORTER [#{name}]: no files to convert."
-    end
-
-    if importer.has_batch_enabled? and importer.has_valid_repository? # import JSON batch files
-      importer.import
-    else
-      puts "IMPORTER [#{name}]: batch disabled or invalid repository."
+      begin
+        importer.lock
+        importer.convert
+        importer.import
+      rescue StandardError => e
+        Log.warn "Importer (#{importer.name}) encountered an unexpected error:\n#{e.message}\n#{e.backtrace}"
+      ensure
+        importer.unlock
+      end
     end
   end
 end
